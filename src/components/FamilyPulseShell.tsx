@@ -15,6 +15,7 @@ import type {
   MemoryAttachment,
   MemoryType,
   NewMemoryInput,
+  PromptAudience,
   Screen,
 } from '../types/family'
 import { VoiceComposer } from './VoiceComposer'
@@ -70,6 +71,27 @@ function scoreLine(label: string, value: string | number) {
   )
 }
 
+function normalizeTag(value: string) {
+  return value.trim().toLowerCase()
+}
+
+const familyTimeline = [
+  { date: 'November 2007', title: 'The adventure begins', description: 'Joe and Yonit meet.' },
+  { date: 'December 21, 2008', title: 'Wedding day', description: 'Joe and Yonit get married.' },
+  { date: 'July 10, 2010', title: 'Move to Israel', description: 'A new chapter begins in Israel.' },
+  { date: 'May 3, 2012', title: 'Amichai arrives', description: 'The family grows with its first child.' },
+  { date: 'February 11, 2014', title: 'Tal arrives', description: 'More movement, more energy, more joy.' },
+  { date: 'February 2, 2017', title: 'Lila arrives', description: 'A creative and fearless new spark joins the story.' },
+  { date: 'October 19, 2020', title: 'Leo arrives', description: 'Laughter and little-kid chaos level up the house.' },
+] as const
+
+const crestPanels = [
+  { icon: '✡', title: 'Jewish + Israel', copy: 'Heritage, faith, and home.' },
+  { icon: '🧭', title: 'Poland · Belarus · America', copy: 'Roots carried across generations.' },
+  { icon: '✈️', title: 'Travel + Adventure', copy: 'A family built through movement and discovery.' },
+  { icon: '💻', title: 'Technology + Togetherness', copy: 'Curiosity, connection, and building together.' },
+] as const
+
 function getAgeFromBirthdayLabel(birthdayLabel?: string) {
   if (!birthdayLabel) {
     return null
@@ -109,12 +131,14 @@ export function FamilyPulseShell() {
   const imageUploadInputRef = useRef<HTMLInputElement | null>(null)
   const audioUploadInputRef = useRef<HTMLInputElement | null>(null)
   const videoUploadInputRef = useRef<HTMLInputElement | null>(null)
+  const [interestInput, setInterestInput] = useState((currentMember.interests ?? []).join(', '))
+  const [tagInput, setTagInput] = useState((currentMember.tags ?? []).join(', '))
 
   const [memoryForm, setMemoryForm] = useState<NewMemoryInput>({
     authorId: state.currentMemberId,
     participants: [state.currentMemberId],
     type: 'text',
-    prompt: promptLibrary[0],
+    prompt: promptLibrary[0]?.text ?? 'Capture one meaningful moment from today.',
     content: '',
     attachments: [],
   })
@@ -155,15 +179,6 @@ export function FamilyPulseShell() {
     [state.memoryEntries, currentMember.id, todayKey],
   )
   const remainingPromptResponses = Math.max(0, DAILY_PROMPT_LIMIT - todayPromptResponseCount)
-  const currentPrompt = useMemo(() => {
-    if (promptLibrary.length === 0) {
-      return 'Capture one meaningful moment from today.'
-    }
-    const seed = `${currentMember.id}-${todayKey}`
-      .split('')
-      .reduce((sum, char) => sum + char.charCodeAt(0), 0)
-    return promptLibrary[(seed + promptOffset) % promptLibrary.length]
-  }, [currentMember.id, todayKey, promptOffset])
   const todaysEngagementPoints =
     (currentMemberMood ? DAILY_TASK_POINTS.mood : 0) +
     (todayActivityCount > 0 ? DAILY_TASK_POINTS.activity : 0) +
@@ -178,6 +193,38 @@ export function FamilyPulseShell() {
           ? 'kid'
           : 'teen'
       : null
+  const audienceBucket: PromptAudience = currentMember.role === 'adult'
+    ? 'adult'
+    : childAgeTier ?? 'all'
+  const memberPromptTags = useMemo(
+    () => new Set([...(currentMember.interests ?? []), ...(currentMember.tags ?? [])].map(normalizeTag)),
+    [currentMember.interests, currentMember.tags],
+  )
+  const currentPrompt = useMemo(() => {
+    if (promptLibrary.length === 0) {
+      return 'Capture one meaningful moment from today.'
+    }
+
+    const eligiblePrompts = promptLibrary.filter((prompt) => {
+      const audiences = prompt.audiences ?? ['all']
+      return audiences.includes('all') || audiences.includes(audienceBucket)
+    })
+
+    const rankedPrompts = eligiblePrompts
+      .map((prompt, index) => ({
+        prompt,
+        index,
+        score: (prompt.tags ?? []).filter((tag) => memberPromptTags.has(normalizeTag(tag))).length,
+      }))
+      .sort((left, right) => right.score - left.score || left.index - right.index)
+
+    const promptPool = rankedPrompts.length > 0 ? rankedPrompts.map((item) => item.prompt) : promptLibrary
+    const seed = `${currentMember.id}-${todayKey}`
+      .split('')
+      .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+
+    return promptPool[(seed + promptOffset) % promptPool.length]?.text ?? 'Capture one meaningful moment from today.'
+  }, [audienceBucket, currentMember.id, memberPromptTags, promptOffset, todayKey])
   const level = Math.floor(currentMemberStats.points / 100) + 1
   const currentLevelFloor = (level - 1) * 100
   const nextLevelAt = level * 100
@@ -390,19 +437,36 @@ export function FamilyPulseShell() {
   }
 
   function selectProfile(memberId: string) {
+    const selectedMember = state.members.find((member) => member.id === memberId)
     actions.setCurrentMember(memberId)
     actions.setScreen('mood')
     setPromptOffset(0)
     setLoreMode('prompt')
+    setInterestInput((selectedMember?.interests ?? []).join(', '))
+    setTagInput((selectedMember?.tags ?? []).join(', '))
     setMemoryForm((current) => ({
       ...current,
       authorId: memberId,
       participants: [memberId],
-      prompt: promptLibrary[0] ?? 'Capture one meaningful moment from today.',
+      prompt: promptLibrary[0]?.text ?? 'Capture one meaningful moment from today.',
       content: '',
       attachments: [],
     }))
     setProfileLockedIn(true)
+  }
+
+  function saveProfileKeywords() {
+    const interests = interestInput
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    const tags = tagInput
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+
+    actions.updateMemberProfile(currentMember.id, { interests, tags })
+    setUploadNotice('Profile interests and tags updated.')
   }
 
   function handleMoodSelection(moodId: string) {
@@ -545,12 +609,63 @@ export function FamilyPulseShell() {
   if (!profileLockedIn) {
     return (
       <main className="min-h-screen bg-transparent px-4 py-5 text-stone-950 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl space-y-8 py-6 sm:py-10">
-          <section className="overflow-hidden rounded-[2rem] border border-stone-900/10 bg-[linear-gradient(135deg,rgba(255,252,245,0.96),rgba(248,241,228,0.92))] p-6 shadow-[0_24px_80px_rgba(120,113,108,0.16)] sm:p-10">
-            <p className="text-xs uppercase tracking-[0.28em] text-stone-600">Family Pulse</p>
-            <h1 className="mt-4 max-w-3xl font-serif text-4xl tracking-tight text-stone-950 sm:text-6xl">
-              Choose your profile
-            </h1>
+        <div className="mx-auto max-w-6xl space-y-8 py-6 sm:py-10">
+          <section className="overflow-hidden rounded-[2rem] border border-stone-900/10 bg-[radial-gradient(circle_at_top,rgba(255,247,220,0.94),rgba(245,237,224,0.9)_45%,rgba(238,232,225,0.96))] p-6 shadow-[0_24px_80px_rgba(120,113,108,0.16)] sm:p-10">
+            <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+              <div className="space-y-6">
+                <p className="text-xs uppercase tracking-[0.28em] text-stone-600">Serkin Family Archive</p>
+                <h1 className="max-w-4xl font-serif text-4xl tracking-tight text-stone-950 sm:text-6xl">
+                  Welcome to the Serkin Family Lore Archive.
+                </h1>
+                <p className="max-w-2xl text-base leading-7 text-stone-700 sm:text-lg">
+                  A family crest for roots in Jewish history, Israel, Poland, Belarus, America, and a life shaped by travel, technology, togetherness, and family.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {crestPanels.map((panel) => (
+                    <div key={panel.title} className="rounded-[1.5rem] border border-stone-900/10 bg-white/75 p-4 backdrop-blur">
+                      <p className="text-2xl">{panel.icon}</p>
+                      <p className="mt-2 text-sm font-semibold uppercase tracking-[0.16em] text-stone-800">{panel.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-stone-600">{panel.copy}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-stone-900/10 bg-white/70 p-5 backdrop-blur">
+                <div className="mx-auto grid h-[21rem] w-[min(22rem,100%)] grid-cols-2 overflow-hidden rounded-[2.5rem_2.5rem_3.5rem_3.5rem] border-[10px] border-stone-950/90 bg-stone-950 shadow-[0_18px_45px_rgba(41,37,36,0.22)]">
+                  <div className="flex flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#f7e9b4,#f0c95f)] p-4 text-center">
+                    <span className="text-4xl">✡</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-800">Jewish</span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#dbeafe,#8ec5ff)] p-4 text-center">
+                    <span className="text-4xl">🕍</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-800">Israel</span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#fbe2e2,#f4a8a8)] p-4 text-center">
+                    <span className="text-4xl">🧭</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-800">Poland · Belarus · America</span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#dff6ea,#9fdeb9)] p-4 text-center">
+                    <span className="text-4xl">🏠</span>
+                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-800">Travel · Tech · Family</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
+            <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Family timeline</p>
+            <h2 className="mt-2 font-serif text-3xl tracking-tight text-stone-950">The story so far</h2>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {familyTimeline.map((event) => (
+                <article key={event.date + event.title} className="rounded-[1.5rem] border border-stone-900/10 bg-stone-50/90 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">{event.date}</p>
+                  <h3 className="mt-2 text-xl font-semibold text-stone-950">{event.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-stone-600">{event.description}</p>
+                </article>
+              ))}
+            </div>
           </section>
 
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1220,6 +1335,44 @@ export function FamilyPulseShell() {
                   ))}
                 </div>
               )}
+
+              {(currentMember.tags?.length ?? 0) > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(currentMember.tags ?? []).map((tag) => (
+                    <span key={tag} className="rounded-full bg-stone-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-stone-50">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-semibold text-stone-800">Interests</label>
+                  <input
+                    value={interestInput}
+                    onChange={(event) => setInterestInput(event.target.value)}
+                    placeholder="soccer, travel, technology"
+                    className="mt-3 w-full rounded-[1.25rem] border border-stone-900/10 bg-stone-50 px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-900/25"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-stone-800">Tags</label>
+                  <input
+                    value={tagInput}
+                    onChange={(event) => setTagInput(event.target.value)}
+                    placeholder="maker, funny, leader"
+                    className="mt-3 w-full rounded-[1.25rem] border border-stone-900/10 bg-stone-50 px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-900/25"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={saveProfileKeywords}
+                className="mt-4 rounded-full bg-stone-950 px-5 py-3 text-sm font-semibold text-stone-50"
+              >
+                Save interests and tags
+              </button>
 
               {isChildProfile && (
                 <div className={`mt-6 rounded-[1.75rem] border p-5 ${childTheme.shellClass}`}>

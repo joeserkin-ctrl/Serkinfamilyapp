@@ -19,6 +19,8 @@ export type MemoryType = 'text' | 'voice' | 'photo' | 'video'
 
 export type AttachmentKind = 'image' | 'audio' | 'video'
 
+export type PromptAudience = 'all' | 'little' | 'kid' | 'teen' | 'adult'
+
 export interface MemoryAttachment {
   id: string
   kind: AttachmentKind
@@ -45,7 +47,15 @@ export interface Member {
   birthdayLabel?: string
   profileSummary?: string
   interests?: string[]
+  tags?: string[]
   proxyOwnerId?: string
+}
+
+export interface PromptTemplate {
+  id: string
+  text: string
+  tags?: string[]
+  audiences?: PromptAudience[]
 }
 
 export interface MoodOption {
@@ -161,6 +171,7 @@ export interface NewMemberInput {
   birthdayLabel?: string
   profileSummary?: string
   interests?: string[]
+  tags?: string[]
   proxyOwnerId?: string
 }
 

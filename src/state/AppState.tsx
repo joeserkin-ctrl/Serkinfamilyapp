@@ -15,9 +15,9 @@ import {
   upsertDailyMoodEntry,
 } from '../lib/familyPulse'
 import { FamilyPulseContext, type FamilyPulseContextValue } from './familyPulseContext'
-import type { AppState, NewMemberInput, NewMemoryInput, Screen, UiMode } from '../types/family'
+import type { AppState, Member, NewMemberInput, NewMemoryInput, Screen, UiMode } from '../types/family'
 
-const STORAGE_KEY = 'family-pulse-state-v3'
+const STORAGE_KEY = 'family-pulse-state-v4'
 
 type Action =
   | { type: 'set-screen'; screen: Screen }
@@ -27,6 +27,7 @@ type Action =
   | { type: 'add-memory'; payload: NewMemoryInput }
   | { type: 'complete-activity'; memberId: string; activityId: string }
   | { type: 'add-member'; payload: NewMemberInput }
+  | { type: 'update-member-profile'; memberId: string; patch: Pick<Member, 'interests' | 'tags'> }
 
 function withDerivedData(state: AppState): AppState {
   return {
@@ -120,6 +121,19 @@ function reducer(state: AppState, action: Action): AppState {
         ],
       })
     }
+    case 'update-member-profile': {
+      return withDerivedData({
+        ...state,
+        members: state.members.map((member) =>
+          member.id === action.memberId
+            ? {
+                ...member,
+                ...action.patch,
+              }
+            : member,
+        ),
+      })
+    }
     default:
       return state
   }
@@ -170,6 +184,8 @@ export function FamilyPulseProvider({ children }: PropsWithChildren) {
         completeActivity: (memberId, activityId) =>
           dispatch({ type: 'complete-activity', memberId, activityId }),
         addMember: (payload) => dispatch({ type: 'add-member', payload }),
+        updateMemberProfile: (memberId, patch) =>
+          dispatch({ type: 'update-member-profile', memberId, patch }),
       },
     }),
     [familyMood, memberStatsById, state, suggestedActivities, todayMoodMap],

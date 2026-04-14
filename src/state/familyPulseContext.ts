@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import { aggregateFamilyMood, getMemberStats, getTodayMoodMap, suggestActivities } from '../lib/familyPulse'
-import type { AppState, NewMemberInput, NewMemoryInput, Screen, UiMode } from '../types/family'
+import type { AppState, Member, NewMemberInput, NewMemoryInput, Screen, UiMode } from '../types/family'
 
 export interface FamilyPulseContextValue {
   state: AppState
@@ -17,6 +17,7 @@ export interface FamilyPulseContextValue {
     addMemory: (payload: NewMemoryInput) => void
     completeActivity: (memberId: string, activityId: string) => void
     addMember: (payload: NewMemberInput) => void
+    updateMemberProfile: (memberId: string, patch: Pick<Member, 'interests' | 'tags'>) => void
   }
 }
 

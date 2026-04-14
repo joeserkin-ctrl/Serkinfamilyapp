@@ -1,19 +1,25 @@
 import { daysAgo } from '../lib/familyPulse'
-import type { Activity, AppState, BadgeDefinition, Family, Member, MoodOption } from '../types/family'
+import type { Activity, AppState, BadgeDefinition, Family, Member, MoodOption, PromptTemplate } from '../types/family'
 
-export const promptLibrary = [
-  'What was the best part of your day?',
-  'What felt hard today, and what helped?',
-  'What is one thing you are proud of today?',
-  'What made you laugh today?',
-  'What is one thing you want help with tomorrow?',
-  'What is one thing you learned today?',
-  'What is one thing you want the family to remember from today?',
-  'What kind thing did you do for someone today?',
-  'What did Nala do that made everyone react?',
-  'What did you build, create, or design today?',
-  'What sports or movement moment felt good today?',
-  'What is one small win worth celebrating tonight?',
+export const promptLibrary: PromptTemplate[] = [
+  { id: 'best-part', text: 'What was the best part of your day?', tags: ['gratitude', 'daily'], audiences: ['all'] },
+  { id: 'hard-thing', text: 'What felt hard today, and what helped?', tags: ['reflection', 'support'], audiences: ['kid', 'teen', 'adult'] },
+  { id: 'proud-moment', text: 'What is one thing you are proud of today?', tags: ['confidence', 'daily'], audiences: ['all'] },
+  { id: 'laugh', text: 'What made you laugh today?', tags: ['joy', 'humor'], audiences: ['all'] },
+  { id: 'help-tomorrow', text: 'What is one thing you want help with tomorrow?', tags: ['support', 'planning'], audiences: ['kid', 'teen', 'adult'] },
+  { id: 'learned', text: 'What is one thing you learned today?', tags: ['learning', 'school'], audiences: ['kid', 'teen', 'adult'] },
+  { id: 'family-remember', text: 'What is one thing you want the family to remember from today?', tags: ['family', 'memory'], audiences: ['all'] },
+  { id: 'kind-thing', text: 'What kind thing did you do for someone today?', tags: ['kindness', 'family'], audiences: ['all'] },
+  { id: 'nala', text: 'What did Nala do that made everyone react?', tags: ['animals', 'family'], audiences: ['all'] },
+  { id: 'create', text: 'What did you build, create, or design today?', tags: ['technology', 'creative', 'building'], audiences: ['kid', 'teen', 'adult'] },
+  { id: 'sports', text: 'What sports or movement moment felt good today?', tags: ['sports', 'movement'], audiences: ['kid', 'teen', 'adult'] },
+  { id: 'small-win', text: 'What is one small win worth celebrating tonight?', tags: ['celebration', 'daily'], audiences: ['all'] },
+  { id: 'little-favorite', text: 'What was your favorite fun thing today?', tags: ['play', 'joy'], audiences: ['little'] },
+  { id: 'little-help', text: 'Who helped you today or who did you help?', tags: ['family', 'kindness'], audiences: ['little'] },
+  { id: 'teen-energy', text: 'What gave you energy today, and what drained it?', tags: ['reflection', 'balance'], audiences: ['teen'] },
+  { id: 'teen-focus', text: 'What project, idea, or goal are you most into right now?', tags: ['technology', 'goals', 'creative'], audiences: ['teen'] },
+  { id: 'travel-memory', text: 'What place, trip, or travel memory are you thinking about today?', tags: ['travel', 'memory'], audiences: ['all'] },
+  { id: 'togetherness', text: 'When did you feel most connected to the family today?', tags: ['family', 'togetherness'], audiences: ['all'] },
 ]
 
 export const moodOptions: MoodOption[] = [
@@ -321,6 +327,7 @@ const members: Member[] = [
     birthdayLabel: 'March 6, 1983',
     profileSummary: 'Full time work, full time mom — keeps the whole house running.',
     interests: ['family', 'organization', 'wellness', 'cooking'],
+    tags: ['mom', 'care', 'home-base'],
   },
   {
     id: 'member-joe',
@@ -332,6 +339,7 @@ const members: Member[] = [
     birthdayLabel: 'March 8, 1982',
     profileSummary: 'Full time employee, full time dad — always up for a challenge.',
     interests: ['technology', 'family', 'sports', 'cooking'],
+    tags: ['dad', 'builder', 'mentor'],
   },
   {
     id: 'member-amichai',
@@ -343,6 +351,7 @@ const members: Member[] = [
     birthdayLabel: 'May 3, 2012',
     profileSummary: 'Teen with a passion for airplanes, 3D printing, and figuring out how things work.',
     interests: ['airplanes', '3d-printing', 'engineering', 'technology'],
+    tags: ['teen', 'maker', 'inventor'],
   },
   {
     id: 'member-tal',
@@ -354,6 +363,7 @@ const members: Member[] = [
     birthdayLabel: 'February 11, 2014',
     profileSummary: 'Soccer, tennis, Lego, and video games — always moving or building.',
     interests: ['soccer', 'tennis', 'lego', 'video-games'],
+    tags: ['sports', 'games', 'energy'],
   },
   {
     id: 'member-lila',
@@ -365,6 +375,7 @@ const members: Member[] = [
     birthdayLabel: 'February 2, 2017',
     profileSummary: 'Gymnastics, aerial silks, fashion, and a big heart for animals.',
     interests: ['gymnastics', 'aerial-silks', 'fashion', 'animals'],
+    tags: ['creative', 'performer', 'animals'],
   },
   {
     id: 'member-leo',
@@ -376,6 +387,7 @@ const members: Member[] = [
     birthdayLabel: 'October 19, 2020',
     profileSummary: 'Video games, soccer, Lego — and an unstoppable talent for making everyone laugh.',
     interests: ['video-games', 'soccer', 'humor', 'lego'],
+    tags: ['little', 'funny', 'play'],
   },
   {
     id: 'member-nala',
@@ -388,6 +400,7 @@ const members: Member[] = [
     birthdayLabel: '~3 years old',
     profileSummary: 'Certified sock thief, professional zoomies expert, and everyone\'s favorite.',
     interests: ['animals'],
+    tags: ['dog', 'chaos', 'cute'],
   },
 ]
 
