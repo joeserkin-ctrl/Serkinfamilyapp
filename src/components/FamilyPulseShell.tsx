@@ -2,6 +2,7 @@ import {
   startTransition,
   useDeferredValue,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -45,21 +46,6 @@ const DAILY_TASK_POINTS = {
   prompt: 20,
 } as const
 
-const attachmentTypeCopy: Record<AttachmentKind, { label: string; helper: string }> = {
-  image: {
-    label: 'Upload photo',
-    helper: 'JPG, PNG, HEIC and camera capture on mobile.',
-  },
-  audio: {
-    label: 'Upload voice note',
-    helper: 'M4A, MP3, WAV or direct mic capture on supported phones.',
-  },
-  video: {
-    label: 'Upload video snippet',
-    helper: 'Keep clips short for quick family recap playback.',
-  },
-}
-
 const entryTypeByAttachmentKind: Record<AttachmentKind, MemoryType> = {
   image: 'photo',
   audio: 'voice',
@@ -100,6 +86,9 @@ export function FamilyPulseShell() {
   const [profileLockedIn, setProfileLockedIn] = useState(false)
   const [promptOffset, setPromptOffset] = useState(0)
   const [loreMode, setLoreMode] = useState<'prompt' | 'quick'>('prompt')
+  const imageUploadInputRef = useRef<HTMLInputElement | null>(null)
+  const audioUploadInputRef = useRef<HTMLInputElement | null>(null)
+  const videoUploadInputRef = useRef<HTMLInputElement | null>(null)
 
   const [memoryForm, setMemoryForm] = useState<NewMemoryInput>({
     authorId: state.currentMemberId,
@@ -332,6 +321,24 @@ export function FamilyPulseShell() {
       ...current,
       attachments: (current.attachments ?? []).filter((_, attachmentIndex) => attachmentIndex !== index),
     }))
+  }
+
+  function selectEntryType(type: MemoryType) {
+    setMemoryForm((current) => ({ ...current, type }))
+
+    if (type === 'photo') {
+      imageUploadInputRef.current?.click()
+      return
+    }
+
+    if (type === 'voice') {
+      audioUploadInputRef.current?.click()
+      return
+    }
+
+    if (type === 'video') {
+      videoUploadInputRef.current?.click()
+    }
   }
 
   if (!profileLockedIn) {
@@ -721,7 +728,7 @@ export function FamilyPulseShell() {
                       <button
                         key={type}
                         type="button"
-                        onClick={() => setMemoryForm((current) => ({ ...current, type }))}
+                        onClick={() => selectEntryType(type)}
                         className={memoryForm.type === type
                           ? 'rounded-full bg-orange-300 px-4 py-2 text-sm font-semibold text-stone-950'
                           : 'rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700'}
@@ -768,52 +775,40 @@ export function FamilyPulseShell() {
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-sm font-semibold text-stone-800">Media uploads</label>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <label className="cursor-pointer rounded-3xl border border-stone-900/10 bg-stone-50 px-4 py-4 text-sm font-semibold text-stone-800 transition hover:border-stone-900/25">
-                      <span>{attachmentTypeCopy.image.label}</span>
-                      <p className="mt-1 text-xs font-medium text-stone-500">{attachmentTypeCopy.image.helper}</p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(event) => {
-                          void handleAttachmentUpload(event, 'image')
-                        }}
-                      />
-                    </label>
+                  <label className="text-sm font-semibold text-stone-800">Media</label>
+                  <p className="text-sm text-stone-600">
+                    Choose Photo, Voice, or Video above to open your device picker. Tap the same type again to add more files.
+                  </p>
 
-                    <label className="cursor-pointer rounded-3xl border border-stone-900/10 bg-stone-50 px-4 py-4 text-sm font-semibold text-stone-800 transition hover:border-stone-900/25">
-                      <span>{attachmentTypeCopy.audio.label}</span>
-                      <p className="mt-1 text-xs font-medium text-stone-500">{attachmentTypeCopy.audio.helper}</p>
-                      <input
-                        type="file"
-                        accept="audio/*"
-                        capture="user"
-                        className="hidden"
-                        onChange={(event) => {
-                          void handleAttachmentUpload(event, 'audio')
-                        }}
-                      />
-                    </label>
+                  <input
+                    ref={imageUploadInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      void handleAttachmentUpload(event, 'image')
+                    }}
+                  />
+                  <input
+                    ref={audioUploadInputRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      void handleAttachmentUpload(event, 'audio')
+                    }}
+                  />
+                  <input
+                    ref={videoUploadInputRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      void handleAttachmentUpload(event, 'video')
+                    }}
+                  />
 
-                    <label className="cursor-pointer rounded-3xl border border-stone-900/10 bg-stone-50 px-4 py-4 text-sm font-semibold text-stone-800 transition hover:border-stone-900/25">
-                      <span>{attachmentTypeCopy.video.label}</span>
-                      <p className="mt-1 text-xs font-medium text-stone-500">{attachmentTypeCopy.video.helper}</p>
-                      <input
-                        type="file"
-                        accept="video/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(event) => {
-                          void handleAttachmentUpload(event, 'video')
-                        }}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
+                  {memoryForm.type === 'voice' && (
                     <div className="rounded-3xl border border-stone-900/10 bg-stone-50 px-4 py-4">
                       <p className="text-sm font-semibold text-stone-800">Record in app</p>
                       <p className="mt-1 text-xs font-medium text-stone-500">
@@ -827,7 +822,9 @@ export function FamilyPulseShell() {
                         />
                       </div>
                     </div>
+                  )}
 
+                  {memoryForm.type === 'video' && (
                     <div className="rounded-3xl border border-stone-900/10 bg-stone-50 px-4 py-4">
                       <p className="text-sm font-semibold text-stone-800">Record short video</p>
                       <p className="mt-1 text-xs font-medium text-stone-500">
@@ -841,7 +838,7 @@ export function FamilyPulseShell() {
                         />
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {uploadNotice && (
                     <p className="rounded-2xl border border-stone-900/10 bg-stone-50 px-3 py-2 text-sm text-stone-600">
