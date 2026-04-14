@@ -148,6 +148,34 @@ export function FamilyPulseShell() {
     (currentMemberMood ? DAILY_TASK_POINTS.mood : 0) +
     (todayActivityCount > 0 ? DAILY_TASK_POINTS.activity : 0) +
     Math.min(todayPromptResponseCount, DAILY_PROMPT_LIMIT) * DAILY_TASK_POINTS.prompt
+  const isChildProfile = currentMember.role === 'child'
+  const level = Math.floor(currentMemberStats.points / 100) + 1
+  const currentLevelFloor = (level - 1) * 100
+  const nextLevelAt = level * 100
+  const pointsIntoLevel = currentMemberStats.points - currentLevelFloor
+  const pointsPerLevel = nextLevelAt - currentLevelFloor
+  const levelProgress = Math.min(100, Math.round((pointsIntoLevel / pointsPerLevel) * 100))
+  const nextBadgeTarget = useMemo(() => {
+    const currentCounts = {
+      moods: currentMemberStats.moodLogs,
+      memories: currentMemberStats.memoryEntries,
+      activities: currentMemberStats.activitiesCompleted,
+    }
+
+    const missing = state.badgeDefinitions
+      .filter((badge) => !currentMemberStats.badges.some((owned) => owned.id === badge.id))
+      .map((badge) => {
+        const value = currentCounts[badge.metric]
+        return {
+          ...badge,
+          remaining: Math.max(0, badge.threshold - value),
+          progressLabel: `${value}/${badge.threshold}`,
+        }
+      })
+      .sort((a, b) => a.remaining - b.remaining)
+
+    return missing[0]
+  }, [currentMemberStats, state.badgeDefinitions])
 
   const dailyChecklist = [
     {
@@ -180,6 +208,32 @@ export function FamilyPulseShell() {
       done: todayUploadCount > 0,
       progress: todayUploadCount > 0 ? 'Done' : 'Optional bonus',
       points: 0,
+      screen: 'lore' as Screen,
+    },
+  ] as const
+  const childQuestBoard = [
+    {
+      id: 'quest-mood',
+      title: 'Mood Hero',
+      target: 'Log your mood once today',
+      done: Boolean(currentMemberMood),
+      reward: '+10 XP',
+      screen: 'mood' as Screen,
+    },
+    {
+      id: 'quest-activity',
+      title: 'Action Star',
+      target: 'Complete one activity',
+      done: todayActivityCount > 0,
+      reward: '+15 XP',
+      screen: 'activities' as Screen,
+    },
+    {
+      id: 'quest-lore',
+      title: 'Story Builder',
+      target: 'Answer up to 3 lore prompts',
+      done: todayPromptResponseCount >= DAILY_PROMPT_LIMIT,
+      reward: `+${DAILY_TASK_POINTS.prompt * DAILY_PROMPT_LIMIT} XP max`,
       screen: 'lore' as Screen,
     },
   ] as const
@@ -1024,7 +1078,61 @@ export function FamilyPulseShell() {
                   ))}
                 </div>
               )}
+
+              {isChildProfile && (
+                <div className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50/80 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">Level Progress</p>
+                    <p className="rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-900">
+                      Level {level}
+                    </p>
+                  </div>
+                  <div className="mt-3 h-3 overflow-hidden rounded-full bg-amber-100">
+                    <div className="h-full rounded-full bg-amber-400" style={{ width: `${levelProgress}%` }} />
+                  </div>
+                  <p className="mt-2 text-sm text-amber-800">
+                    {pointsIntoLevel} / {pointsPerLevel} XP to Level {level + 1}
+                  </p>
+                </div>
+              )}
             </article>
+
+            {isChildProfile && (
+              <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Quest board</p>
+                  <p className="rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50">
+                    Daily XP: {todaysEngagementPoints}
+                  </p>
+                </div>
+                <div className="mt-6 space-y-3">
+                  {childQuestBoard.map((quest) => (
+                    <button
+                      key={quest.id}
+                      type="button"
+                      onClick={() => navigate(quest.screen)}
+                      className="flex w-full items-center justify-between rounded-3xl border border-stone-900/10 bg-stone-50/90 px-4 py-4 text-left transition hover:border-stone-900/25"
+                    >
+                      <div>
+                        <p className="text-base font-semibold text-stone-900">{quest.done ? '🏆' : '🎯'} {quest.title}</p>
+                        <p className="mt-1 text-sm text-stone-500">{quest.target}</p>
+                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-600">{quest.reward}</p>
+                    </button>
+                  ))}
+                </div>
+                {nextBadgeTarget && (
+                  <div className="mt-5 rounded-3xl border border-stone-900/10 bg-white px-4 py-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-stone-500">Next badge</p>
+                    <p className="mt-2 text-lg font-semibold text-stone-900">{nextBadgeTarget.name}</p>
+                    <p className="mt-1 text-sm text-stone-600">{nextBadgeTarget.description}</p>
+                    <p className="mt-2 text-sm font-medium text-stone-700">
+                      Progress: {nextBadgeTarget.progressLabel} · {nextBadgeTarget.remaining} to go
+                    </p>
+                  </div>
+                )}
+              </article>
+            )}
 
             <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
               <div className="flex flex-wrap items-center justify-between gap-3">
