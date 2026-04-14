@@ -1,4 +1,4 @@
-import { daysAgo, generateId } from '../lib/familyPulse'
+import { daysAgo } from '../lib/familyPulse'
 import type { Activity, AppState, BadgeDefinition, Family, Member, MoodOption } from '../types/family'
 
 export const promptLibrary = [
@@ -372,114 +372,9 @@ export function createSeedState(): AppState {
     moodOptions,
     badgeDefinitions,
     activities: activityLibrary,
-    moodEntries: [
-      {
-        id: generateId('mood'),
-        memberId: 'member-joe',
-        moodId: 'fox-focused',
-        createdAt: daysAgo(0, 8),
-      },
-      {
-        id: generateId('mood'),
-        memberId: 'member-yonit',
-        moodId: 'otter-bright',
-        createdAt: daysAgo(0, 8),
-      },
-      {
-        id: generateId('mood'),
-        memberId: 'member-tal',
-        moodId: 'puppy-zoom',
-        createdAt: daysAgo(1, 7),
-      },
-      {
-        id: generateId('mood'),
-        memberId: 'member-leo',
-        moodId: 'puppy-zoom',
-        createdAt: daysAgo(1, 7),
-      },
-      {
-        id: generateId('mood'),
-        memberId: 'member-lila',
-        moodId: 'fox-focused',
-        createdAt: daysAgo(2, 9),
-      },
-    ],
-    activityLogs: [
-      {
-        id: generateId('activity-log'),
-        activityId: 'compliment-swap',
-        memberId: 'member-yonit',
-        createdAt: daysAgo(1, 18),
-      },
-      {
-        id: generateId('activity-log'),
-        activityId: 'backyard-soccer',
-        memberId: 'member-tal',
-        createdAt: daysAgo(3, 17),
-      },
-      {
-        id: generateId('activity-log'),
-        activityId: 'paper-plane-contest',
-        memberId: 'member-amichai',
-        createdAt: daysAgo(5, 15),
-      },
-    ],
-    memoryEntries: [
-      {
-        id: generateId('memory'),
-        authorId: 'member-yonit',
-        participants: ['member-yonit', 'member-leo'],
-        type: 'text',
-        prompt: promptLibrary[6],
-        content: 'Leo invented a new language at breakfast — it was mostly just very loud vowels — and had everyone in tears laughing.',
-        createdAt: daysAgo(0, 10),
-      },
-      {
-        id: generateId('memory'),
-        authorId: 'member-joe',
-        participants: ['member-joe', 'member-nala'],
-        type: 'photo',
-        prompt: promptLibrary[3],
-        content: 'Nala stole a sock, then paraded through the living room like she had won a championship.',
-        attachments: [
-          {
-            id: generateId('attachment'),
-            kind: 'image',
-            name: 'nala-sock.jpg',
-            mimeType: 'image/jpeg',
-            url: 'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=80',
-          },
-        ],
-        createdAt: daysAgo(2, 15),
-      },
-      {
-        id: generateId('memory'),
-        authorId: 'member-amichai',
-        participants: ['member-amichai', 'member-joe'],
-        type: 'text',
-        prompt: promptLibrary[4],
-        content: 'Finally finished the landing gear design — it actually prints clean this time. Dad said it looks like a real Airbus part.',
-        createdAt: daysAgo(3, 16),
-      },
-      {
-        id: generateId('memory'),
-        authorId: 'member-lila',
-        participants: ['member-lila', 'member-yonit'],
-        type: 'text',
-        prompt: promptLibrary[5],
-        content: 'Lila held her first unsupported aerial silks drop today. Coach said she was fearless.',
-        createdAt: daysAgo(4, 17),
-      },
-      {
-        id: generateId('memory'),
-        authorId: 'member-tal',
-        participants: ['member-tal', 'member-leo', 'member-joe'],
-        type: 'text',
-        prompt: promptLibrary[1],
-        content: 'We built a blanket fort and called it Thunder Base. Leo immediately claimed the best corner.',
-        createdAt: daysAgo(6, 19),
-      },
-    ],
+    moodEntries: [],
+    activityLogs: [],
+    memoryEntries: [],
     weeklySummaries: [],
     currentMemberId: 'member-joe',
     activeScreen: 'home',

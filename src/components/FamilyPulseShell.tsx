@@ -235,9 +235,6 @@ export function FamilyPulseShell() {
             <h1 className="mt-4 max-w-3xl font-serif text-4xl tracking-tight text-stone-950 sm:text-6xl">
               Choose your profile
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-stone-700 sm:text-lg">
-              Each person enters their own space. Family-wide visibility appears only in Storyboard.
-            </p>
           </section>
 
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -272,12 +269,8 @@ export function FamilyPulseShell() {
                 </span>
               </div>
               <h1 className="mt-6 max-w-4xl font-serif text-4xl tracking-tight text-stone-950 sm:text-6xl">
-                Family Lore and mood-based rhythms in one shared home app.
+                Welcome, {currentMember.name}
               </h1>
-              <p className="mt-4 max-w-3xl text-base leading-7 text-stone-700 sm:text-lg">
-                The daily loop is live: each member checks in, the family mood updates,
-                activities are suggested, and memories feed into a shared weekly recap.
-              </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
@@ -539,9 +532,6 @@ export function FamilyPulseShell() {
                       >
                         Mark as done
                       </button>
-                      <p className="self-center text-sm text-stone-600">
-                        Completion adds positive points and contributes to the weekly hero.
-                      </p>
                     </div>
                   </article>
                 ))}
@@ -549,8 +539,8 @@ export function FamilyPulseShell() {
             </article>
 
             <article className="rounded-[2rem] border border-stone-900/10 bg-stone-950 p-6 text-stone-50 shadow-[0_24px_80px_rgba(28,25,23,0.2)] sm:p-8">
-              <p className="text-xs uppercase tracking-[0.3em] text-stone-400">Matching logic</p>
-              <h3 className="mt-3 text-3xl font-semibold">How the MVP suggests activities</h3>
+              <p className="text-xs uppercase tracking-[0.3em] text-stone-400">Suggestions</p>
+              <h3 className="mt-3 text-3xl font-semibold">Why these activities</h3>
               <ul className="mt-5 space-y-3 text-sm leading-6 text-stone-300">
                 <li>Low energy / cozy favors gentle indoor prompts and calming connection.</li>
                 <li>Mixed / chaotic favors grounding or balanced reset activities.</li>
