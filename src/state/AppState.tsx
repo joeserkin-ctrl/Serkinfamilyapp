@@ -25,6 +25,8 @@ type Action =
   | { type: 'set-current-member'; memberId: string }
   | { type: 'log-mood'; memberId: string; moodId: string }
   | { type: 'add-memory'; payload: NewMemoryInput }
+  | { type: 'update-memory'; memoryId: string; patch: Pick<AppState['memoryEntries'][number], 'prompt' | 'content'> }
+  | { type: 'delete-memory'; memoryId: string }
   | { type: 'complete-activity'; memberId: string; activityId: string }
   | { type: 'add-member'; payload: NewMemberInput }
   | { type: 'update-member-profile'; memberId: string; patch: Pick<Member, 'interests' | 'tags'> }
@@ -93,6 +95,25 @@ function reducer(state: AppState, action: Action): AppState {
           },
           ...state.memoryEntries,
         ],
+      })
+    }
+    case 'update-memory': {
+      return withDerivedData({
+        ...state,
+        memoryEntries: state.memoryEntries.map((entry) =>
+          entry.id === action.memoryId
+            ? {
+                ...entry,
+                ...action.patch,
+              }
+            : entry,
+        ),
+      })
+    }
+    case 'delete-memory': {
+      return withDerivedData({
+        ...state,
+        memoryEntries: state.memoryEntries.filter((entry) => entry.id !== action.memoryId),
       })
     }
     case 'complete-activity': {
@@ -181,6 +202,8 @@ export function FamilyPulseProvider({ children }: PropsWithChildren) {
         setCurrentMember: (memberId) => dispatch({ type: 'set-current-member', memberId }),
         logMood: (memberId, moodId) => dispatch({ type: 'log-mood', memberId, moodId }),
         addMemory: (payload) => dispatch({ type: 'add-memory', payload }),
+        updateMemory: (memoryId, patch) => dispatch({ type: 'update-memory', memoryId, patch }),
+        deleteMemory: (memoryId) => dispatch({ type: 'delete-memory', memoryId }),
         completeActivity: (memberId, activityId) =>
           dispatch({ type: 'complete-activity', memberId, activityId }),
         addMember: (payload) => dispatch({ type: 'add-member', payload }),

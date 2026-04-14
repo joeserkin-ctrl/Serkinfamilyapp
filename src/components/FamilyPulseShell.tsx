@@ -19,8 +19,8 @@ import type {
   Screen,
 } from '../types/family'
 import { VoiceComposer } from './VoiceComposer'
+import { ArchiveExplorer } from './ArchiveExplorer'
 import { MediaRecorderCapture } from './MediaRecorderCapture'
-import { Storyboard } from './Storyboard'
 
 const screens: Array<{ id: Screen; label: string }> = [
   { id: 'mood', label: 'Mood Check' },
@@ -184,6 +184,7 @@ export function FamilyPulseShell() {
     (todayActivityCount > 0 ? DAILY_TASK_POINTS.activity : 0) +
     Math.min(todayPromptResponseCount, DAILY_PROMPT_LIMIT) * DAILY_TASK_POINTS.prompt
   const isChildProfile = currentMember.role === 'child'
+  const isArchiveAdmin = currentMember.id === 'member-yonit' || currentMember.id === 'member-joe'
   const currentMemberAge = getAgeFromBirthdayLabel(currentMember.birthdayLabel)
   const childAgeTier =
     isChildProfile && currentMemberAge !== null
@@ -1490,7 +1491,13 @@ export function FamilyPulseShell() {
                 <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">The Serkin Story</h2>
                 <p className="mt-2 text-base text-stone-600">Browse every memory in your family timeline.</p>
               </div>
-              <Storyboard />
+              <ArchiveExplorer
+                entries={state.memoryEntries}
+                members={state.members}
+                isAdmin={isArchiveAdmin}
+                onUpdateMemory={actions.updateMemory}
+                onDeleteMemory={actions.deleteMemory}
+              />
             </section>
           )}
       </div>

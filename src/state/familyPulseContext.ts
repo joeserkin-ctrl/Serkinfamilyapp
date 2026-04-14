@@ -15,6 +15,8 @@ export interface FamilyPulseContextValue {
     setCurrentMember: (memberId: string) => void
     logMood: (memberId: string, moodId: string) => void
     addMemory: (payload: NewMemoryInput) => void
+    updateMemory: (memoryId: string, patch: Pick<AppState['memoryEntries'][number], 'prompt' | 'content'>) => void
+    deleteMemory: (memoryId: string) => void
     completeActivity: (memberId: string, activityId: string) => void
     addMember: (payload: NewMemberInput) => void
     updateMemberProfile: (memberId: string, patch: Pick<Member, 'interests' | 'tags'>) => void
