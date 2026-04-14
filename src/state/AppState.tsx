@@ -17,7 +17,7 @@ import {
 import { FamilyPulseContext, type FamilyPulseContextValue } from './familyPulseContext'
 import type { AppState, NewMemberInput, NewMemoryInput, Screen, UiMode } from '../types/family'
 
-const STORAGE_KEY = 'family-pulse-state-v2'
+const STORAGE_KEY = 'family-pulse-state-v3'
 
 type Action =
   | { type: 'set-screen'; screen: Screen }
