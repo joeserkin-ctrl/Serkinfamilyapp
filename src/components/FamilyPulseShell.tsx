@@ -70,6 +70,26 @@ function scoreLine(label: string, value: string | number) {
   )
 }
 
+function getAgeFromBirthdayLabel(birthdayLabel?: string) {
+  if (!birthdayLabel) {
+    return null
+  }
+
+  const parsed = new Date(birthdayLabel)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+
+  const now = new Date()
+  let age = now.getFullYear() - parsed.getFullYear()
+  const monthDiff = now.getMonth() - parsed.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < parsed.getDate())) {
+    age -= 1
+  }
+
+  return age
+}
+
 export function FamilyPulseShell() {
   const {
     state,
@@ -149,6 +169,15 @@ export function FamilyPulseShell() {
     (todayActivityCount > 0 ? DAILY_TASK_POINTS.activity : 0) +
     Math.min(todayPromptResponseCount, DAILY_PROMPT_LIMIT) * DAILY_TASK_POINTS.prompt
   const isChildProfile = currentMember.role === 'child'
+  const currentMemberAge = getAgeFromBirthdayLabel(currentMember.birthdayLabel)
+  const childAgeTier =
+    isChildProfile && currentMemberAge !== null
+      ? currentMemberAge <= 6
+        ? 'little'
+        : currentMemberAge <= 11
+          ? 'kid'
+          : 'teen'
+      : null
   const level = Math.floor(currentMemberStats.points / 100) + 1
   const currentLevelFloor = (level - 1) * 100
   const nextLevelAt = level * 100
@@ -176,6 +205,65 @@ export function FamilyPulseShell() {
 
     return missing[0]
   }, [currentMemberStats, state.badgeDefinitions])
+  const childTheme = childAgeTier === 'little'
+    ? {
+        progressLabel: 'Star path',
+        levelLabel: 'Star Level',
+        questBoardLabel: 'Adventure map',
+        xpLabel: 'Sparkles today',
+        pendingIcon: '🪄',
+        completeIcon: '🌟',
+        shellClass: 'border-pink-200 bg-pink-50/80',
+        accentTextClass: 'text-pink-700',
+        pillClass: 'bg-pink-200 text-pink-900',
+        barClass: 'bg-pink-400',
+        rewardTitle: 'Treasure chest',
+      }
+    : childAgeTier === 'teen'
+      ? {
+          progressLabel: 'Rank progress',
+          levelLabel: 'Rank',
+          questBoardLabel: 'Mission board',
+          xpLabel: 'XP today',
+          pendingIcon: '⚡',
+          completeIcon: '✅',
+          shellClass: 'border-sky-200 bg-sky-50/80',
+          accentTextClass: 'text-sky-700',
+          pillClass: 'bg-sky-200 text-sky-900',
+          barClass: 'bg-sky-500',
+          rewardTitle: 'Unlock track',
+        }
+      : {
+          progressLabel: 'Level progress',
+          levelLabel: 'Level',
+          questBoardLabel: 'Quest board',
+          xpLabel: 'Daily XP',
+          pendingIcon: '🎯',
+          completeIcon: '🏆',
+          shellClass: 'border-amber-200 bg-amber-50/80',
+          accentTextClass: 'text-amber-700',
+          pillClass: 'bg-amber-200 text-amber-900',
+          barClass: 'bg-amber-400',
+          rewardTitle: 'Reward unlocks',
+        }
+  const rewardUnlocks = childAgeTier === 'little'
+    ? [
+        { level: 2, title: 'Sticker pop', description: 'Unlock a pretend sticker shower celebration.' },
+        { level: 3, title: 'Dance break', description: 'Earn a mini dance-party reward with the family.' },
+        { level: 5, title: 'Super helper cape', description: 'Unlock your next big-helper title at home.' },
+      ]
+    : childAgeTier === 'teen'
+      ? [
+          { level: 2, title: 'Streak status', description: 'Unlock a stronger profile rank and streak flex.' },
+          { level: 4, title: 'Creator badge', description: 'Unlock a milestone badge for consistent entries.' },
+          { level: 6, title: 'Captain tier', description: 'Reach captain tier with stronger momentum.' },
+        ]
+      : [
+          { level: 2, title: 'Bonus badge', description: 'Unlock a new badge milestone.' },
+          { level: 4, title: 'Challenge champ', description: 'Earn a bigger daily challenge title.' },
+          { level: 6, title: 'Adventure captain', description: 'Hit a major progression milestone.' },
+        ]
+  const nextRewardUnlock = rewardUnlocks.find((reward) => reward.level > level) ?? rewardUnlocks[rewardUnlocks.length - 1]
 
   const dailyChecklist = [
     {
@@ -211,32 +299,86 @@ export function FamilyPulseShell() {
       screen: 'lore' as Screen,
     },
   ] as const
-  const childQuestBoard = [
-    {
-      id: 'quest-mood',
-      title: 'Mood Hero',
-      target: 'Log your mood once today',
-      done: Boolean(currentMemberMood),
-      reward: '+10 XP',
-      screen: 'mood' as Screen,
-    },
-    {
-      id: 'quest-activity',
-      title: 'Action Star',
-      target: 'Complete one activity',
-      done: todayActivityCount > 0,
-      reward: '+15 XP',
-      screen: 'activities' as Screen,
-    },
-    {
-      id: 'quest-lore',
-      title: 'Story Builder',
-      target: 'Answer up to 3 lore prompts',
-      done: todayPromptResponseCount >= DAILY_PROMPT_LIMIT,
-      reward: `+${DAILY_TASK_POINTS.prompt * DAILY_PROMPT_LIMIT} XP max`,
-      screen: 'lore' as Screen,
-    },
-  ] as const
+  const childQuestBoard = childAgeTier === 'little'
+    ? [
+        {
+          id: 'quest-mood',
+          title: 'Mood sticker',
+          target: 'Pick the face that matches your day',
+          done: Boolean(currentMemberMood),
+          reward: '+10 sparkles',
+          screen: 'mood' as Screen,
+        },
+        {
+          id: 'quest-activity',
+          title: 'Play quest',
+          target: 'Do one fun activity today',
+          done: todayActivityCount > 0,
+          reward: '+15 sparkles',
+          screen: 'activities' as Screen,
+        },
+        {
+          id: 'quest-lore',
+          title: 'Story star',
+          target: 'Share up to 3 little stories or pictures',
+          done: todayPromptResponseCount >= DAILY_PROMPT_LIMIT,
+          reward: `+${DAILY_TASK_POINTS.prompt * DAILY_PROMPT_LIMIT} sparkles max`,
+          screen: 'lore' as Screen,
+        },
+      ]
+    : childAgeTier === 'teen'
+      ? [
+          {
+            id: 'quest-mood',
+            title: 'Check-in complete',
+            target: 'Log your mood once today',
+            done: Boolean(currentMemberMood),
+            reward: '+10 XP',
+            screen: 'mood' as Screen,
+          },
+          {
+            id: 'quest-activity',
+            title: 'Momentum',
+            target: 'Finish one activity challenge',
+            done: todayActivityCount > 0,
+            reward: '+15 XP',
+            screen: 'activities' as Screen,
+          },
+          {
+            id: 'quest-lore',
+            title: 'Creator streak',
+            target: 'Respond to up to 3 lore prompts',
+            done: todayPromptResponseCount >= DAILY_PROMPT_LIMIT,
+            reward: `+${DAILY_TASK_POINTS.prompt * DAILY_PROMPT_LIMIT} XP max`,
+            screen: 'lore' as Screen,
+          },
+        ]
+      : [
+          {
+            id: 'quest-mood',
+            title: 'Mood Hero',
+            target: 'Log your mood once today',
+            done: Boolean(currentMemberMood),
+            reward: '+10 XP',
+            screen: 'mood' as Screen,
+          },
+          {
+            id: 'quest-activity',
+            title: 'Action Star',
+            target: 'Complete one activity',
+            done: todayActivityCount > 0,
+            reward: '+15 XP',
+            screen: 'activities' as Screen,
+          },
+          {
+            id: 'quest-lore',
+            title: 'Story Builder',
+            target: 'Answer up to 3 lore prompts',
+            done: todayPromptResponseCount >= DAILY_PROMPT_LIMIT,
+            reward: `+${DAILY_TASK_POINTS.prompt * DAILY_PROMPT_LIMIT} XP max`,
+            screen: 'lore' as Screen,
+          },
+        ]
 
   const visibleMemories = useMemo(
     () => deferredMemories.filter((entry) => entry.authorId === currentMember.id),
@@ -1080,18 +1222,18 @@ export function FamilyPulseShell() {
               )}
 
               {isChildProfile && (
-                <div className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50/80 p-5">
+                <div className={`mt-6 rounded-[1.75rem] border p-5 ${childTheme.shellClass}`}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">Level Progress</p>
-                    <p className="rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-900">
-                      Level {level}
+                    <p className={`text-sm font-semibold uppercase tracking-[0.2em] ${childTheme.accentTextClass}`}>{childTheme.progressLabel}</p>
+                    <p className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${childTheme.pillClass}`}>
+                      {childTheme.levelLabel} {level}
                     </p>
                   </div>
-                  <div className="mt-3 h-3 overflow-hidden rounded-full bg-amber-100">
-                    <div className="h-full rounded-full bg-amber-400" style={{ width: `${levelProgress}%` }} />
+                  <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/70">
+                    <div className={`h-full rounded-full ${childTheme.barClass}`} style={{ width: `${levelProgress}%` }} />
                   </div>
-                  <p className="mt-2 text-sm text-amber-800">
-                    {pointsIntoLevel} / {pointsPerLevel} XP to Level {level + 1}
+                  <p className={`mt-2 text-sm ${childTheme.accentTextClass}`}>
+                    {pointsIntoLevel} / {pointsPerLevel} XP to {childTheme.levelLabel} {level + 1}
                   </p>
                 </div>
               )}
@@ -1100,9 +1242,9 @@ export function FamilyPulseShell() {
             {isChildProfile && (
               <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Quest board</p>
+                  <p className="text-xs uppercase tracking-[0.3em] text-stone-500">{childTheme.questBoardLabel}</p>
                   <p className="rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50">
-                    Daily XP: {todaysEngagementPoints}
+                    {childTheme.xpLabel}: {todaysEngagementPoints}
                   </p>
                 </div>
                 <div className="mt-6 space-y-3">
@@ -1114,12 +1256,34 @@ export function FamilyPulseShell() {
                       className="flex w-full items-center justify-between rounded-3xl border border-stone-900/10 bg-stone-50/90 px-4 py-4 text-left transition hover:border-stone-900/25"
                     >
                       <div>
-                        <p className="text-base font-semibold text-stone-900">{quest.done ? '🏆' : '🎯'} {quest.title}</p>
+                        <p className="text-base font-semibold text-stone-900">{quest.done ? childTheme.completeIcon : childTheme.pendingIcon} {quest.title}</p>
                         <p className="mt-1 text-sm text-stone-500">{quest.target}</p>
                       </div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-600">{quest.reward}</p>
                     </button>
                   ))}
+                </div>
+                <div className="mt-5 rounded-3xl border border-stone-900/10 bg-stone-50 px-4 py-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{childTheme.rewardTitle}</p>
+                  <div className="mt-3 space-y-3">
+                    {rewardUnlocks.map((reward) => {
+                      const unlocked = level >= reward.level
+                      return (
+                        <div key={reward.level} className="flex items-start justify-between gap-3 rounded-2xl bg-white px-3 py-3">
+                          <div>
+                            <p className="text-sm font-semibold text-stone-900">{unlocked ? '🔓' : '🔒'} {reward.title}</p>
+                            <p className="mt-1 text-sm text-stone-500">{reward.description}</p>
+                          </div>
+                          <p className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Lv {reward.level}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {nextRewardUnlock && level < nextRewardUnlock.level && (
+                    <p className="mt-3 text-sm font-medium text-stone-700">
+                      Next unlock at {childTheme.levelLabel.toLowerCase()} {nextRewardUnlock.level}: {nextRewardUnlock.title}
+                    </p>
+                  )}
                 </div>
                 {nextBadgeTarget && (
                   <div className="mt-5 rounded-3xl border border-stone-900/10 bg-white px-4 py-4">
