@@ -14,7 +14,6 @@ import type {
   AttachmentKind,
   MemoryAttachment,
   MemoryType,
-  NewMemberInput,
   NewMemoryInput,
   Role,
   Screen,
@@ -96,7 +95,6 @@ function scoreLine(label: string, value: string | number) {
 export function FamilyPulseShell() {
   const {
     state,
-    familyMood,
     suggestedActivities,
     todayMoodMap,
     memberStatsById,
@@ -107,6 +105,7 @@ export function FamilyPulseShell() {
   const currentMember =
     state.members.find((member) => member.id === state.currentMemberId) ?? state.members[0]
   const deferredMemories = useDeferredValue(state.memoryEntries)
+  const [profileLockedIn, setProfileLockedIn] = useState(false)
 
   const [memoryForm, setMemoryForm] = useState<NewMemoryInput>({
     authorId: state.currentMemberId,
@@ -119,26 +118,23 @@ export function FamilyPulseShell() {
 
   const [uploadNotice, setUploadNotice] = useState('')
 
-  const [memberForm, setMemberForm] = useState<NewMemberInput>({
-    name: '',
-    avatar: '🙂',
-    role: 'child',
-    accessType: 'shared-hub',
-    proxyOwnerId: '',
-  })
-
-  const leaderboard = useMemo(
-    () =>
-      [...state.members].sort(
-        (left, right) => memberStatsById[right.id].points - memberStatsById[left.id].points,
-      ),
-    [memberStatsById, state.members],
-  )
-
   const hubMode = state.uiMode === 'hub'
+  const currentMemberStats = memberStatsById[currentMember.id]
+  const currentMemberMood = state.moodOptions.find(
+    (option) => option.id === todayMoodMap[currentMember.id]?.moodId,
+  )
+  const visibleMemories = useMemo(
+    () => deferredMemories.filter((entry) => entry.authorId === currentMember.id),
+    [deferredMemories, currentMember.id],
+  )
 
   function navigate(screen: Screen) {
     startTransition(() => actions.setScreen(screen))
+  }
+
+  function selectProfile(memberId: string) {
+    actions.setCurrentMember(memberId)
+    setProfileLockedIn(true)
   }
 
   function submitMemory(event: FormEvent<HTMLFormElement>) {
@@ -243,25 +239,39 @@ export function FamilyPulseShell() {
     }))
   }
 
-  function submitMember(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!memberForm.name.trim()) {
-      return
-    }
+  if (!profileLockedIn) {
+    return (
+      <main className="min-h-screen bg-transparent px-4 py-5 text-stone-950 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl space-y-8 py-6 sm:py-10">
+          <section className="overflow-hidden rounded-[2rem] border border-stone-900/10 bg-[linear-gradient(135deg,rgba(255,252,245,0.96),rgba(248,241,228,0.92))] p-6 shadow-[0_24px_80px_rgba(120,113,108,0.16)] sm:p-10">
+            <p className="text-xs uppercase tracking-[0.28em] text-stone-600">Family Pulse</p>
+            <h1 className="mt-4 max-w-3xl font-serif text-4xl tracking-tight text-stone-950 sm:text-6xl">
+              Choose your profile
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-stone-700 sm:text-lg">
+              Each person enters their own space. Family-wide visibility appears only in Storyboard.
+            </p>
+          </section>
 
-    actions.addMember({
-      ...memberForm,
-      name: memberForm.name.trim(),
-      proxyOwnerId: memberForm.accessType === 'proxy' ? memberForm.proxyOwnerId : undefined,
-    })
-
-    setMemberForm({
-      name: '',
-      avatar: '🙂',
-      role: 'child',
-      accessType: 'shared-hub',
-      proxyOwnerId: '',
-    })
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {state.members.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                onClick={() => selectProfile(member.id)}
+                className="rounded-[1.75rem] border border-stone-900/10 bg-white/85 p-5 text-left shadow-sm transition hover:border-stone-900/30 hover:shadow-md"
+              >
+                <p className="text-2xl font-semibold text-stone-950">{member.avatar} {member.name}</p>
+                <p className="mt-2 text-sm text-stone-600">{roleLabels[member.role]} · {accessLabels[member.accessType]}</p>
+                {member.profileTitle && (
+                  <p className="mt-2 text-xs uppercase tracking-[0.2em] text-stone-500">{member.profileTitle}</p>
+                )}
+              </button>
+            ))}
+          </section>
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -300,14 +310,21 @@ export function FamilyPulseShell() {
                 >
                   Add a family memory
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setProfileLockedIn(false)}
+                  className="rounded-full border border-stone-900/15 bg-white/80 px-6 py-3 text-sm font-semibold text-stone-800 transition hover:border-stone-900/30"
+                >
+                  Switch profile
+                </button>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              {scoreLine('Mood state', familyMood.label)}
-              {scoreLine('Participation streak', `${currentWeekSummary.participationStreak} days`)}
-              {scoreLine('Weekly hero', state.members.find((member) => member.id === currentWeekSummary.hero.memberId)?.name ?? 'Pending')}
-              {scoreLine('Today logged', `${familyMood.loggedCount}/${familyMood.memberCount}`)}
+              {scoreLine('My mood', currentMemberMood?.label ?? 'Not logged yet')}
+              {scoreLine('My streak', `${currentMemberStats.streak} days`)}
+              {scoreLine('My points', currentMemberStats.points)}
+              {scoreLine('My logs today', currentMemberMood ? '1/1' : '0/1')}
             </div>
           </div>
         </section>
@@ -346,29 +363,14 @@ export function FamilyPulseShell() {
               <div className="rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm text-stone-600">
                 Current member: <span className="font-semibold text-stone-900">{currentMember.avatar} {currentMember.name}</span>
               </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            {state.members.map((member) => (
               <button
-                key={member.id}
                 type="button"
-                onClick={() => actions.setCurrentMember(member.id)}
-                className={state.currentMemberId === member.id
-                  ? hubMode
-                    ? 'rounded-3xl border border-stone-950 bg-stone-950 px-5 py-4 text-left text-base font-semibold text-stone-50'
-                    : 'rounded-full border border-stone-950 bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50'
-                  : hubMode
-                    ? 'rounded-3xl border border-stone-900/10 bg-white px-5 py-4 text-left text-base font-medium text-stone-800'
-                    : 'rounded-full border border-stone-900/10 bg-white px-4 py-2 text-sm font-medium text-stone-800'}
+                onClick={() => setProfileLockedIn(false)}
+                className="rounded-full border border-stone-900/15 bg-white px-4 py-2 text-sm font-semibold text-stone-800"
               >
-                <span>{member.avatar} {member.name}</span>
-                <span className="ml-2 text-xs uppercase tracking-[0.2em] text-inherit/70">
-                  {member.accessType === 'proxy' ? 'proxy' : member.role}
-                </span>
+                Switch profile
               </button>
-            ))}
+            </div>
           </div>
         </section>
 
@@ -394,21 +396,23 @@ export function FamilyPulseShell() {
             <div className="space-y-6">
               <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Today&apos;s pulse</p>
-                <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">{familyMood.label}</h2>
-                <p className="mt-3 max-w-2xl text-base leading-7 text-stone-700">{familyMood.description}</p>
-                <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                  {state.members.map((member) => {
-                    const moodEntry = todayMoodMap[member.id]
-                    const mood = state.moodOptions.find((option) => option.id === moodEntry?.moodId)
-                    return (
-                      <div key={member.id} className="rounded-3xl bg-stone-50/90 p-4">
-                        <p className="text-sm font-semibold text-stone-900">{member.avatar} {member.name}</p>
-                        <p className="mt-2 text-sm text-stone-600">
-                          {mood ? `${mood.emoji} ${mood.label}` : 'Waiting for check-in'}
-                        </p>
-                      </div>
-                    )
-                  })}
+                <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">Your daily pulse</h2>
+                <p className="mt-3 max-w-2xl text-base leading-7 text-stone-700">
+                  Focused personal space for {currentMember.name}. Family-wide story browsing is available in Storyboard.
+                </p>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-3xl bg-stone-50/90 p-4">
+                    <p className="text-sm font-semibold text-stone-900">{currentMember.avatar} {currentMember.name}</p>
+                    <p className="mt-2 text-sm text-stone-600">
+                      {currentMemberMood ? `${currentMemberMood.emoji} ${currentMemberMood.label}` : 'Waiting for check-in'}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl bg-stone-50/90 p-4">
+                    <p className="text-sm font-semibold text-stone-900">Weekly progress</p>
+                    <p className="mt-2 text-sm text-stone-600">
+                      {currentMemberStats.moodLogs} moods · {currentMemberStats.memoryEntries} memories · {currentMemberStats.activitiesCompleted} activities
+                    </p>
+                  </div>
                 </div>
               </article>
 
@@ -466,13 +470,13 @@ export function FamilyPulseShell() {
 
               <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Weekly hero</p>
-                <h3 className="mt-3 text-3xl font-semibold text-stone-950">
-                  {state.members.find((member) => member.id === currentWeekSummary.hero.memberId)?.name}
-                </h3>
+                <h3 className="mt-3 text-3xl font-semibold text-stone-950">{currentMember.name}</h3>
                 <p className="mt-2 text-sm font-medium uppercase tracking-[0.24em] text-orange-600">
-                  {currentWeekSummary.hero.title}
+                  Personal snapshot
                 </p>
-                <p className="mt-4 text-base leading-7 text-stone-700">{currentWeekSummary.hero.reason}</p>
+                <p className="mt-4 text-base leading-7 text-stone-700">
+                  You are on a {currentMemberStats.streak}-day participation streak with {currentMemberStats.points} points total.
+                </p>
               </article>
             </div>
           </section>
@@ -483,64 +487,49 @@ export function FamilyPulseShell() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Mood check-in</p>
-                <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">Fast daily check-ins for every member</h2>
+                <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">Fast daily check-in</h2>
               </div>
               <p className="max-w-xl text-sm leading-6 text-stone-600">
-                Shared hub mode makes each option larger and easier to tap for younger family members.
+                Shared hub mode makes each option larger and easier to tap.
               </p>
             </div>
 
-            <div className="mt-8 grid gap-5 xl:grid-cols-2">
-              {state.members.map((member) => {
-                const selectedMood = state.moodOptions.find(
-                  (option) => option.id === todayMoodMap[member.id]?.moodId,
-                )
+            <div className="mt-8">
+              <article className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-2xl font-semibold text-stone-950">{currentMember.avatar} {currentMember.name}</h3>
+                    <p className="mt-1 text-sm text-stone-600">{roleLabels[currentMember.role]} · {accessLabels[currentMember.accessType]}</p>
+                  </div>
+                </div>
 
-                return (
-                  <article key={member.id} className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="text-2xl font-semibold text-stone-950">{member.avatar} {member.name}</h3>
-                        <p className="mt-1 text-sm text-stone-600">{roleLabels[member.role]} · {accessLabels[member.accessType]}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => actions.setCurrentMember(member.id)}
-                        className="rounded-full border border-stone-900/15 bg-white px-4 py-2 text-sm font-semibold text-stone-800"
-                      >
-                        Focus member
-                      </button>
-                    </div>
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {state.moodOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => actions.logMood(currentMember.id, option.id)}
+                      className={currentMemberMood?.id === option.id
+                        ? hubMode
+                          ? 'rounded-[1.5rem] border border-stone-950 bg-stone-950 px-4 py-5 text-left text-lg font-semibold text-stone-50'
+                          : 'rounded-3xl border border-stone-950 bg-stone-950 px-4 py-4 text-left text-sm font-semibold text-stone-50'
+                        : hubMode
+                          ? 'rounded-[1.5rem] border border-stone-900/10 bg-white px-4 py-5 text-left text-lg font-medium text-stone-900'
+                          : 'rounded-3xl border border-stone-900/10 bg-white px-4 py-4 text-left text-sm font-medium text-stone-900'}
+                    >
+                      <div className="text-3xl">{option.emoji}</div>
+                      <div className="mt-2">{option.label}</div>
+                      <div className="mt-1 text-xs uppercase tracking-[0.2em] text-inherit/70">{option.animal}</div>
+                    </button>
+                  ))}
+                </div>
 
-                    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {state.moodOptions.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => actions.logMood(member.id, option.id)}
-                          className={selectedMood?.id === option.id
-                            ? hubMode
-                              ? 'rounded-[1.5rem] border border-stone-950 bg-stone-950 px-4 py-5 text-left text-lg font-semibold text-stone-50'
-                              : 'rounded-3xl border border-stone-950 bg-stone-950 px-4 py-4 text-left text-sm font-semibold text-stone-50'
-                            : hubMode
-                              ? 'rounded-[1.5rem] border border-stone-900/10 bg-white px-4 py-5 text-left text-lg font-medium text-stone-900'
-                              : 'rounded-3xl border border-stone-900/10 bg-white px-4 py-4 text-left text-sm font-medium text-stone-900'}
-                        >
-                          <div className="text-3xl">{option.emoji}</div>
-                          <div className="mt-2">{option.label}</div>
-                          <div className="mt-1 text-xs uppercase tracking-[0.2em] text-inherit/70">{option.animal}</div>
-                        </button>
-                      ))}
-                    </div>
-
-                    <p className="mt-4 text-sm text-stone-600">
-                      {selectedMood
-                        ? `Logged today as ${selectedMood.label}.`
-                        : 'No mood logged yet today.'}
-                    </p>
-                  </article>
-                )
-              })}
+                <p className="mt-4 text-sm text-stone-600">
+                  {currentMemberMood
+                    ? `Logged today as ${currentMemberMood.label}.`
+                    : 'No mood logged yet today.'}
+                </p>
+              </article>
             </div>
           </section>
         )}
@@ -549,7 +538,7 @@ export function FamilyPulseShell() {
           <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
             <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
               <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Activity engine</p>
-              <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">Rule-based suggestions for the current family mood</h2>
+              <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">Suggestions for your current mood and interests</h2>
               <div className="mt-6 space-y-4">
                 {suggestedActivities.map((activity) => (
                   <article key={activity.id} className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
@@ -645,28 +634,9 @@ export function FamilyPulseShell() {
                 <div>
                   <label className="text-sm font-semibold text-stone-800">Participants</label>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {state.members.map((member) => {
-                      const selected = memoryForm.participants.includes(member.id)
-                      return (
-                        <button
-                          key={member.id}
-                          type="button"
-                          onClick={() =>
-                            setMemoryForm((current) => ({
-                              ...current,
-                              participants: selected
-                                ? current.participants.filter((participantId) => participantId !== member.id)
-                                : [...current.participants, member.id],
-                            }))
-                          }
-                          className={selected
-                            ? 'rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50'
-                            : 'rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700'}
-                        >
-                          {member.avatar} {member.name}
-                        </button>
-                      )
-                    })}
+                    <span className="rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50">
+                      {currentMember.avatar} {currentMember.name}
+                    </span>
                   </div>
                 </div>
 
@@ -810,7 +780,7 @@ export function FamilyPulseShell() {
             <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
               <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Shared timeline</p>
               <div className="mt-6 space-y-4">
-                {deferredMemories.map((entry) => {
+                {visibleMemories.map((entry) => {
                   const author = state.members.find((member) => member.id === entry.authorId)
                   const participants = entry.participants
                     .map((participantId) => state.members.find((member) => member.id === participantId)?.name)
@@ -852,7 +822,7 @@ export function FamilyPulseShell() {
                           ))}
                         </div>
                       )}
-                      <p className="mt-4 text-sm text-stone-500">Participants: {participants || 'None selected'}</p>
+                      <p className="mt-4 text-sm text-stone-500">Participants: {participants || currentMember.name}</p>
                     </article>
                   )
                 })}
@@ -866,67 +836,55 @@ export function FamilyPulseShell() {
             <article className="rounded-[2rem] border border-stone-900/10 bg-stone-950 p-6 text-stone-50 shadow-[0_24px_80px_rgba(28,25,23,0.2)] sm:p-8">
               <p className="text-xs uppercase tracking-[0.3em] text-stone-400">Weekly recap</p>
               <h2 className="mt-3 text-4xl font-semibold">{currentWeekSummary.weekLabel}</h2>
-              <p className="mt-5 text-base leading-8 text-stone-300">{currentWeekSummary.story}</p>
+              <p className="mt-5 text-base leading-8 text-stone-300">
+                Personal recap for {currentMember.name}: {currentMemberStats.moodLogs} moods logged, {currentMemberStats.memoryEntries} memories added, and {currentMemberStats.activitiesCompleted} activities completed.
+              </p>
               <div className="mt-8 rounded-[1.75rem] border border-white/10 bg-white/6 p-5">
-                <p className="text-sm uppercase tracking-[0.25em] text-orange-200">Weekly hero</p>
-                <h3 className="mt-3 text-3xl font-semibold">
-                  {state.members.find((member) => member.id === currentWeekSummary.hero.memberId)?.name}
-                </h3>
+                <p className="text-sm uppercase tracking-[0.25em] text-orange-200">Personal streak</p>
+                <h3 className="mt-3 text-3xl font-semibold">{currentMemberStats.streak} days</h3>
                 <p className="mt-2 text-sm font-semibold uppercase tracking-[0.24em] text-orange-300">
-                  {currentWeekSummary.hero.title}
+                  Keep momentum
                 </p>
-                <p className="mt-4 text-sm leading-7 text-stone-300">{currentWeekSummary.hero.reason}</p>
+                <p className="mt-4 text-sm leading-7 text-stone-300">Each mood, memory, and activity extends your consistency and positive score.</p>
               </div>
             </article>
 
             <div className="space-y-6">
               <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
-                <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Leaderboard</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Your scorecard</p>
                 <div className="mt-6 space-y-3">
-                  {leaderboard.map((member, index) => {
-                    const stats = memberStatsById[member.id]
-                    return (
-                      <div key={member.id} className="flex items-center justify-between rounded-3xl border border-stone-900/10 bg-stone-50/90 px-4 py-4">
-                        <div>
-                          <p className="text-base font-semibold text-stone-900">
-                            {index + 1}. {member.avatar} {member.name}
-                          </p>
-                          <p className="mt-1 text-sm text-stone-500">
-                            {stats.moodLogs} moods · {stats.memoryEntries} memories · {stats.activitiesCompleted} activities
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-semibold text-stone-950">{stats.points}</p>
-                          <p className="text-xs uppercase tracking-[0.24em] text-stone-500">positive points</p>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  <div className="flex items-center justify-between rounded-3xl border border-stone-900/10 bg-stone-50/90 px-4 py-4">
+                    <div>
+                      <p className="text-base font-semibold text-stone-900">{currentMember.avatar} {currentMember.name}</p>
+                      <p className="mt-1 text-sm text-stone-500">
+                        {currentMemberStats.moodLogs} moods · {currentMemberStats.memoryEntries} memories · {currentMemberStats.activitiesCompleted} activities
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-semibold text-stone-950">{currentMemberStats.points}</p>
+                      <p className="text-xs uppercase tracking-[0.24em] text-stone-500">positive points</p>
+                    </div>
+                  </div>
                 </div>
               </article>
 
               <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
                 <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Badges</p>
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  {state.members.map((member) => {
-                    const badges = memberStatsById[member.id].badges
-                    return (
-                      <div key={member.id} className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
-                        <p className="text-base font-semibold text-stone-900">{member.avatar} {member.name}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {badges.length > 0 ? (
-                            badges.map((badge) => (
-                              <span key={badge.id} className="rounded-full bg-orange-300 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-950">
-                                {badge.name}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-sm text-stone-500">No badges yet. Keep the streak going.</span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
+                <div className="mt-6 grid gap-4 md:grid-cols-1">
+                  <div className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
+                    <p className="text-base font-semibold text-stone-900">{currentMember.avatar} {currentMember.name}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {currentMemberStats.badges.length > 0 ? (
+                        currentMemberStats.badges.map((badge) => (
+                          <span key={badge.id} className="rounded-full bg-orange-300 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-950">
+                            {badge.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-sm text-stone-500">No badges yet. Keep the streak going.</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </article>
             </div>
@@ -934,120 +892,34 @@ export function FamilyPulseShell() {
         )}
 
         {state.activeScreen === 'members' && (
-          <section className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
+          <section className="grid gap-6">
             <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
-              <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Family unit</p>
-              <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">Members and access modes</h2>
-              <div className="mt-6 grid gap-4">
-                {state.members.map((member) => {
-                  const proxyOwner = state.members.find((candidate) => candidate.id === member.proxyOwnerId)
-                  return (
-                    <article key={member.id} className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-2xl font-semibold text-stone-950">{member.avatar} {member.name}</p>
-                          <p className="mt-1 text-sm text-stone-600">{roleLabels[member.role]} · {accessLabels[member.accessType]}</p>
-                        </div>
-                        <div className="rounded-full bg-white px-4 py-2 text-sm font-medium text-stone-700">
-                          {member.accessType === 'proxy' && proxyOwner
-                            ? `Proxy input by ${proxyOwner.name}`
-                            : member.accessType === 'shared-hub'
-                              ? 'Uses family hub'
-                              : 'Uses personal device'}
-                        </div>
-                      </div>
-                    </article>
-                  )
-                })}
+              <p className="text-xs uppercase tracking-[0.3em] text-stone-500">My profile</p>
+              <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">{currentMember.avatar} {currentMember.name}</h2>
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-500">Role</p>
+                  <p className="mt-2 text-xl font-semibold text-stone-950">{roleLabels[currentMember.role]}</p>
+                  <p className="mt-1 text-sm text-stone-600">{accessLabels[currentMember.accessType]}</p>
+                </div>
+                <div className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-500">Birthday</p>
+                  <p className="mt-2 text-xl font-semibold text-stone-950">{currentMember.birthdayLabel ?? 'Not set'}</p>
+                  <p className="mt-1 text-sm text-stone-600">{currentMember.profileTitle ?? 'Family member'}</p>
+                </div>
               </div>
-            </article>
-
-            <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
-              <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Add member</p>
-              <form className="mt-6 space-y-5" onSubmit={submitMember}>
-                <div>
-                  <label className="text-sm font-semibold text-stone-800">Name</label>
-                  <input
-                    value={memberForm.name}
-                    onChange={(event) => setMemberForm((current) => ({ ...current, name: event.target.value }))}
-                    className="mt-3 w-full rounded-full border border-stone-900/10 bg-stone-50 px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-900/25"
-                    placeholder="Add a person or proxy member"
-                  />
+              {currentMember.profileSummary && (
+                <p className="mt-6 text-base leading-7 text-stone-700">{currentMember.profileSummary}</p>
+              )}
+              {(currentMember.interests?.length ?? 0) > 0 && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {(currentMember.interests ?? []).map((interest) => (
+                    <span key={interest} className="rounded-full border border-stone-900/10 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-stone-600">
+                      {interest}
+                    </span>
+                  ))}
                 </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-stone-800">Avatar</label>
-                  <input
-                    value={memberForm.avatar}
-                    onChange={(event) => setMemberForm((current) => ({ ...current, avatar: event.target.value || '🙂' }))}
-                    className="mt-3 w-full rounded-full border border-stone-900/10 bg-stone-50 px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-900/25"
-                    placeholder="Emoji avatar"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-stone-800">Role</label>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(['adult', 'child', 'pet'] as Role[]).map((role) => (
-                      <button
-                        key={role}
-                        type="button"
-                        onClick={() => setMemberForm((current) => ({ ...current, role }))}
-                        className={memberForm.role === role
-                          ? 'rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50'
-                          : 'rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700'}
-                      >
-                        {roleLabels[role]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-stone-800">Access type</label>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(['personal', 'shared-hub', 'proxy'] as AccessType[]).map((accessType) => (
-                      <button
-                        key={accessType}
-                        type="button"
-                        onClick={() => setMemberForm((current) => ({ ...current, accessType }))}
-                        className={memberForm.accessType === accessType
-                          ? 'rounded-full bg-orange-300 px-4 py-2 text-sm font-semibold text-stone-950'
-                          : 'rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700'}
-                      >
-                        {accessLabels[accessType]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {memberForm.accessType === 'proxy' && (
-                  <div>
-                    <label className="text-sm font-semibold text-stone-800">Proxy owner</label>
-                    <select
-                      value={memberForm.proxyOwnerId}
-                      onChange={(event) =>
-                        setMemberForm((current) => ({ ...current, proxyOwnerId: event.target.value }))
-                      }
-                      className="mt-3 w-full rounded-full border border-stone-900/10 bg-stone-50 px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-900/25"
-                    >
-                      <option value="">Select who logs for this member</option>
-                      {state.members.filter((member) => member.accessType !== 'proxy').map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="rounded-full bg-stone-950 px-6 py-3 text-sm font-semibold text-stone-50"
-                >
-                  Add member to family
-                </button>
-              </form>
+              )}
             </article>
           </section>
         )}
