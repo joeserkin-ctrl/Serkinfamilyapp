@@ -10,12 +10,10 @@ import { promptLibrary } from '../data/mockData'
 import { formatTimestamp } from '../lib/familyPulse'
 import { useFamilyPulse } from '../state/familyPulseContext'
 import type {
-  AccessType,
   AttachmentKind,
   MemoryAttachment,
   MemoryType,
   NewMemoryInput,
-  Role,
   Screen,
 } from '../types/family'
 import { VoiceComposer } from './VoiceComposer'
@@ -37,18 +35,6 @@ const memoryTypeLabels: Record<MemoryType, string> = {
   voice: 'Voice',
   photo: 'Photo',
   video: 'Video',
-}
-
-const roleLabels: Record<Role, string> = {
-  adult: 'Adult',
-  child: 'Child',
-  pet: 'Pet / proxy',
-}
-
-const accessLabels: Record<AccessType, string> = {
-  personal: 'Personal device',
-  'shared-hub': 'Shared hub',
-  proxy: 'Proxy only',
 }
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
@@ -134,6 +120,7 @@ export function FamilyPulseShell() {
 
   function selectProfile(memberId: string) {
     actions.setCurrentMember(memberId)
+    actions.setScreen('mood')
     setProfileLockedIn(true)
   }
 
@@ -262,10 +249,6 @@ export function FamilyPulseShell() {
                 className="rounded-[1.75rem] border border-stone-900/10 bg-white/85 p-5 text-left shadow-sm transition hover:border-stone-900/30 hover:shadow-md"
               >
                 <p className="text-2xl font-semibold text-stone-950">{member.avatar} {member.name}</p>
-                <p className="mt-2 text-sm text-stone-600">{roleLabels[member.role]} · {accessLabels[member.accessType]}</p>
-                {member.profileTitle && (
-                  <p className="mt-2 text-xs uppercase tracking-[0.2em] text-stone-500">{member.profileTitle}</p>
-                )}
               </button>
             ))}
           </section>
@@ -351,15 +334,6 @@ export function FamilyPulseShell() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => actions.setMode(hubMode ? 'personal' : 'hub')}
-                className={hubMode
-                  ? 'rounded-2xl bg-orange-300 px-5 py-3 text-base font-semibold text-stone-950'
-                  : 'rounded-full border border-stone-900/15 bg-white px-4 py-2 text-sm font-semibold text-stone-800'}
-              >
-                {hubMode ? 'Shared hub mode on' : 'Switch to shared hub mode'}
-              </button>
               <div className="rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm text-stone-600">
                 Current member: <span className="font-semibold text-stone-900">{currentMember.avatar} {currentMember.name}</span>
               </div>
@@ -499,7 +473,6 @@ export function FamilyPulseShell() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-2xl font-semibold text-stone-950">{currentMember.avatar} {currentMember.name}</h3>
-                    <p className="mt-1 text-sm text-stone-600">{roleLabels[currentMember.role]} · {accessLabels[currentMember.accessType]}</p>
                   </div>
                 </div>
 
@@ -898,9 +871,9 @@ export function FamilyPulseShell() {
               <h2 className="mt-3 font-serif text-4xl tracking-tight text-stone-950">{currentMember.avatar} {currentMember.name}</h2>
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <div className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
-                  <p className="text-sm uppercase tracking-[0.2em] text-stone-500">Role</p>
-                  <p className="mt-2 text-xl font-semibold text-stone-950">{roleLabels[currentMember.role]}</p>
-                  <p className="mt-1 text-sm text-stone-600">{accessLabels[currentMember.accessType]}</p>
+                  <p className="text-sm uppercase tracking-[0.2em] text-stone-500">Profile</p>
+                  <p className="mt-2 text-xl font-semibold text-stone-950">{currentMember.profileTitle ?? 'Family member'}</p>
+                  <p className="mt-1 text-sm text-stone-600">{currentMember.name}</p>
                 </div>
                 <div className="rounded-[1.75rem] border border-stone-900/10 bg-stone-50/90 p-5">
                   <p className="text-sm uppercase tracking-[0.2em] text-stone-500">Birthday</p>
