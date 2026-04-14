@@ -22,8 +22,8 @@ import { MediaRecorderCapture } from './MediaRecorderCapture'
 import { Storyboard } from './Storyboard'
 
 const screens: Array<{ id: Screen; label: string }> = [
-  { id: 'home', label: 'Dashboard' },
   { id: 'mood', label: 'Mood Check' },
+  { id: 'home', label: 'Dashboard' },
   { id: 'activities', label: 'Activities' },
   { id: 'lore', label: 'Family Lore' },
   { id: 'recap', label: 'Weekly Recap' },
@@ -207,6 +207,11 @@ export function FamilyPulseShell() {
       attachments: [],
     }))
     setProfileLockedIn(true)
+  }
+
+  function handleMoodSelection(moodId: string) {
+    actions.logMood(currentMember.id, moodId)
+    navigate('home')
   }
 
   function submitMemory(event: FormEvent<HTMLFormElement>) {
@@ -589,7 +594,7 @@ export function FamilyPulseShell() {
                     <button
                       key={option.id}
                       type="button"
-                      onClick={() => actions.logMood(currentMember.id, option.id)}
+                      onClick={() => handleMoodSelection(option.id)}
                       className={currentMemberMood?.id === option.id
                         ? hubMode
                           ? 'rounded-[1.5rem] border border-stone-950 bg-stone-950 px-4 py-5 text-left text-lg font-semibold text-stone-50'
