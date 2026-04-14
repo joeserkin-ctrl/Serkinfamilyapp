@@ -7,7 +7,7 @@ import {
   type FormEvent,
 } from 'react'
 import { promptLibrary } from '../data/mockData'
-import { formatTimestamp } from '../lib/familyPulse'
+import { formatTimestamp, localDayKey } from '../lib/familyPulse'
 import { useFamilyPulse } from '../state/familyPulseContext'
 import type {
   AttachmentKind,
@@ -38,6 +38,12 @@ const memoryTypeLabels: Record<MemoryType, string> = {
 }
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+const DAILY_PROMPT_LIMIT = 3
+const DAILY_TASK_POINTS = {
+  mood: 10,
+  activity: 15,
+  prompt: 20,
+} as const
 
 const attachmentTypeCopy: Record<AttachmentKind, { label: string; helper: string }> = {
   image: {
@@ -92,6 +98,8 @@ export function FamilyPulseShell() {
     state.members.find((member) => member.id === state.currentMemberId) ?? state.members[0]
   const deferredMemories = useDeferredValue(state.memoryEntries)
   const [profileLockedIn, setProfileLockedIn] = useState(false)
+  const [promptOffset, setPromptOffset] = useState(0)
+  const [loreMode, setLoreMode] = useState<'prompt' | 'quick'>('prompt')
 
   const [memoryForm, setMemoryForm] = useState<NewMemoryInput>({
     authorId: state.currentMemberId,
@@ -109,6 +117,84 @@ export function FamilyPulseShell() {
   const currentMemberMood = state.moodOptions.find(
     (option) => option.id === todayMoodMap[currentMember.id]?.moodId,
   )
+  const todayKey = localDayKey(new Date())
+  const todayActivityCount = useMemo(
+    () =>
+      state.activityLogs.filter(
+        (entry) => entry.memberId === currentMember.id && localDayKey(entry.createdAt) === todayKey,
+      ).length,
+    [state.activityLogs, currentMember.id, todayKey],
+  )
+  const todayPromptResponseCount = useMemo(
+    () =>
+      state.memoryEntries.filter(
+        (entry) =>
+          entry.authorId === currentMember.id &&
+          localDayKey(entry.createdAt) === todayKey &&
+          entry.prompt !== 'Quick capture',
+      ).length,
+    [state.memoryEntries, currentMember.id, todayKey],
+  )
+  const todayUploadCount = useMemo(
+    () =>
+      state.memoryEntries.filter(
+        (entry) =>
+          entry.authorId === currentMember.id &&
+          localDayKey(entry.createdAt) === todayKey &&
+          (entry.attachments?.length ?? 0) > 0,
+      ).length,
+    [state.memoryEntries, currentMember.id, todayKey],
+  )
+  const remainingPromptResponses = Math.max(0, DAILY_PROMPT_LIMIT - todayPromptResponseCount)
+  const currentPrompt = useMemo(() => {
+    if (promptLibrary.length === 0) {
+      return 'Capture one meaningful moment from today.'
+    }
+    const seed = `${currentMember.id}-${todayKey}`
+      .split('')
+      .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+    return promptLibrary[(seed + promptOffset) % promptLibrary.length]
+  }, [currentMember.id, todayKey, promptOffset])
+  const todaysEngagementPoints =
+    (currentMemberMood ? DAILY_TASK_POINTS.mood : 0) +
+    (todayActivityCount > 0 ? DAILY_TASK_POINTS.activity : 0) +
+    Math.min(todayPromptResponseCount, DAILY_PROMPT_LIMIT) * DAILY_TASK_POINTS.prompt
+
+  const dailyChecklist = [
+    {
+      id: 'mood',
+      label: 'Log mood check-in',
+      done: Boolean(currentMemberMood),
+      progress: currentMemberMood ? 'Done' : 'Not yet',
+      points: DAILY_TASK_POINTS.mood,
+      screen: 'mood' as Screen,
+    },
+    {
+      id: 'activity',
+      label: 'Complete one activity',
+      done: todayActivityCount > 0,
+      progress: `${Math.min(todayActivityCount, 1)}/1`,
+      points: DAILY_TASK_POINTS.activity,
+      screen: 'activities' as Screen,
+    },
+    {
+      id: 'prompt',
+      label: `Respond to lore prompts (${DAILY_PROMPT_LIMIT}/day max)`,
+      done: todayPromptResponseCount >= DAILY_PROMPT_LIMIT,
+      progress: `${todayPromptResponseCount}/${DAILY_PROMPT_LIMIT}`,
+      points: DAILY_TASK_POINTS.prompt,
+      screen: 'lore' as Screen,
+    },
+    {
+      id: 'upload',
+      label: 'Upload or record at least one media memory',
+      done: todayUploadCount > 0,
+      progress: todayUploadCount > 0 ? 'Done' : 'Optional bonus',
+      points: 0,
+      screen: 'lore' as Screen,
+    },
+  ] as const
+
   const visibleMemories = useMemo(
     () => deferredMemories.filter((entry) => entry.authorId === currentMember.id),
     [deferredMemories, currentMember.id],
@@ -121,6 +207,16 @@ export function FamilyPulseShell() {
   function selectProfile(memberId: string) {
     actions.setCurrentMember(memberId)
     actions.setScreen('mood')
+    setPromptOffset(0)
+    setLoreMode('prompt')
+    setMemoryForm((current) => ({
+      ...current,
+      authorId: memberId,
+      participants: [memberId],
+      prompt: promptLibrary[0] ?? 'Capture one meaningful moment from today.',
+      content: '',
+      attachments: [],
+    }))
     setProfileLockedIn(true)
   }
 
@@ -129,22 +225,34 @@ export function FamilyPulseShell() {
     const trimmedContent = memoryForm.content.trim()
     const hasAttachments = (memoryForm.attachments?.length ?? 0) > 0
 
+    if (loreMode === 'prompt' && remainingPromptResponses === 0) {
+      setUploadNotice(`You have reached today's prompt limit (${DAILY_PROMPT_LIMIT}). You can still use Quick capture.`)
+      return
+    }
+
     if (!trimmedContent && !hasAttachments) {
       return
     }
 
+    const selectedPrompt = loreMode === 'prompt' ? currentPrompt : 'Quick capture'
+
     actions.addMemory({
       ...memoryForm,
       authorId: state.currentMemberId,
-      content: trimmedContent || 'Shared a media moment.',
-      participants:
-        memoryForm.participants.length > 0 ? memoryForm.participants : [state.currentMemberId],
+      prompt: selectedPrompt,
+      content: trimmedContent || (loreMode === 'prompt' ? 'Prompt response saved.' : 'Media moment saved.'),
+      participants: [state.currentMemberId],
       attachments: hasAttachments ? memoryForm.attachments : undefined,
     })
+
+    if (loreMode === 'prompt') {
+      setPromptOffset((current) => current + 1)
+    }
 
     setMemoryForm((current) => ({
       ...current,
       authorId: state.currentMemberId,
+      prompt: selectedPrompt,
       content: '',
       attachments: [],
       participants: [state.currentMemberId],
@@ -559,22 +667,52 @@ export function FamilyPulseShell() {
 
               <form className="mt-6 space-y-5" onSubmit={submitMemory}>
                 <div>
-                  <label className="text-sm font-semibold text-stone-800">Prompt</label>
+                  <label className="text-sm font-semibold text-stone-800">Entry mode</label>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {promptLibrary.map((prompt) => (
-                      <button
-                        key={prompt}
-                        type="button"
-                        onClick={() => setMemoryForm((current) => ({ ...current, prompt }))}
-                        className={memoryForm.prompt === prompt
-                          ? 'rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50'
-                          : 'rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700'}
-                      >
-                        {prompt}
-                      </button>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setLoreMode('prompt')}
+                      className={loreMode === 'prompt'
+                        ? 'rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50'
+                        : 'rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700'}
+                    >
+                      Prompt response
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLoreMode('quick')}
+                      className={loreMode === 'quick'
+                        ? 'rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50'
+                        : 'rounded-full border border-stone-900/10 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700'}
+                    >
+                      Quick capture
+                    </button>
                   </div>
                 </div>
+
+                {loreMode === 'prompt' && (
+                  <div className="space-y-3 rounded-3xl border border-stone-900/10 bg-stone-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <label className="text-sm font-semibold text-stone-800">
+                        Today&apos;s prompt ({todayPromptResponseCount}/{DAILY_PROMPT_LIMIT})
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setPromptOffset((current) => current + 1)}
+                        className="rounded-full border border-stone-900/20 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-700"
+                        disabled={remainingPromptResponses === 0}
+                      >
+                        New prompt
+                      </button>
+                    </div>
+                    <p className="text-base leading-7 text-stone-700">{currentPrompt}</p>
+                    {remainingPromptResponses === 0 && (
+                      <p className="text-sm font-medium text-orange-700">
+                        Daily prompt limit reached. Switch to Quick capture to keep uploading media.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="text-sm font-semibold text-stone-800">Entry type</label>
@@ -733,9 +871,10 @@ export function FamilyPulseShell() {
 
                 <button
                   type="submit"
+                  disabled={loreMode === 'prompt' && remainingPromptResponses === 0}
                   className="rounded-full bg-stone-950 px-6 py-3 text-sm font-semibold text-stone-50"
                 >
-                  Add to Family Lore
+                  {loreMode === 'prompt' ? 'Save prompt response' : 'Save quick capture'}
                 </button>
               </form>
             </article>
@@ -883,6 +1022,36 @@ export function FamilyPulseShell() {
                   ))}
                 </div>
               )}
+            </article>
+
+            <article className="rounded-[2rem] border border-stone-900/10 bg-white/80 p-6 backdrop-blur sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs uppercase tracking-[0.3em] text-stone-500">Daily checklist</p>
+                <p className="rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-50">
+                  Today&apos;s points: {todaysEngagementPoints}
+                </p>
+              </div>
+              <div className="mt-6 space-y-3">
+                {dailyChecklist.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => navigate(item.screen)}
+                    className="flex w-full items-center justify-between rounded-3xl border border-stone-900/10 bg-stone-50/90 px-4 py-4 text-left transition hover:border-stone-900/25"
+                  >
+                    <div>
+                      <p className="text-base font-semibold text-stone-900">{item.done ? '✅' : '⬜'} {item.label}</p>
+                      <p className="mt-1 text-sm text-stone-500">{item.progress}</p>
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-600">
+                      {item.points > 0 ? `+${item.points} pts` : 'Bonus'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 text-sm text-stone-600">
+                Complete daily inputs to build streaks and unlock badges faster.
+              </p>
             </article>
           </section>
         )}
